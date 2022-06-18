@@ -1,4 +1,4 @@
-# dbt-spark Changelog
+
 
 - This file provides a full account of all changes to `dbt-spark`.
 - Changes are listed under the (pre)release in which they first appear. Subsequent releases include changes from previous releases.
