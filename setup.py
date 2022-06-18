@@ -49,10 +49,11 @@ def _get_dbt_core_version():
     return f"{minor}{pre}"
 
 
-package_name = "dbt-spark"
-package_version = "1.2.0"
+package_name = "dbt-spark-livy"
+# make sure this always matches dbt/adapters/dbt-spark-livy/__version__.py
+package_version = "1.1.0"
 dbt_core_version = _get_dbt_core_version()
-description = """The Apache Spark adapter plugin for dbt"""
+description = """The dbt-spark-livy adapter plugin for Spark in Cloudera DataHub with Livy interface"""
 
 odbc_extras = ["pyodbc>=4.0.30"]
 pyhive_extras = [
@@ -68,9 +69,9 @@ setup(
     description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    author="dbt Labs",
-    author_email="info@dbtlabs.com",
-    url="https://github.com/dbt-labs/dbt-spark",
+    author="Cloudera",
+    author_email="innovation-feedback@cloudera.com",
+    url="https://github.com/cloudera/dbt-impala",
     packages=find_namespace_packages(include=["dbt", "dbt.*"]),
     include_package_data=True,
     install_requires=[
