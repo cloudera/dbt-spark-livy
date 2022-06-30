@@ -50,7 +50,7 @@ def _get_dbt_core_version():
 package_name = "dbt-spark-livy"
 package_version = "1.2.0"
 dbt_core_version = _get_dbt_core_version()
-description = """The Apache Spark adapter plugin for dbt"""
+description = """The dbt-spark-livy adapter plugin for Spark in Cloudera DataHub with Livy interface"""
 
 odbc_extras = ["pyodbc>=4.0.30"]
 pyhive_extras = [
