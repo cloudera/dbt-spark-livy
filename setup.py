@@ -51,8 +51,12 @@ def _get_dbt_core_version():
 
 package_name = "dbt-spark-livy"
 # make sure this always matches dbt/adapters/dbt-spark-livy/__version__.py
+<<<<<<< HEAD
 package_version = "1.1.0"
 dbt_core_version = _get_dbt_core_version()
+=======
+package_version = "1.1.2"
+>>>>>>> adf51f7 (updated adapter version to 1.1.2 to resolve pipy package error)
 description = """The dbt-spark-livy adapter plugin for Spark in Cloudera DataHub with Livy interface"""
 
 odbc_extras = ["pyodbc>=4.0.30"]
