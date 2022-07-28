@@ -91,7 +91,7 @@ class LivyCursor:
             description = [
                 (
                     field['name'],
-                    field['type'], # field['dataType'],
+                    field['dataType'], # field['type'], # field['dataType'],
                     None,
                     None,
                     None,
@@ -131,11 +131,11 @@ class LivyCursor:
         # The following code is actually injecting SQL to pyspark object for executing it via the Livy session - over an HTTP post request.
         # Basically, it is like code inside a code. As a result the strings passed here in 'escapedSQL' variable are unescapted and interpreted on the server side. 
         # This may have repurcursions of code injection not only as SQL, but also arbritary Python code. An alternate way safer way to acheive this is still unknown. 
-        # escapedSQL = sql.replace("\n", "\\n").replace('"', '\\\"')
-        # code = "val sprk_sql = spark.sql(\"" + escapedSQL + "\")\nval sprk_res=sprk_sql.collect\n%json sprk_res"  # .format(escapedSQL)
+        escapedSQL = sql.replace("\n", "\\n").replace('"', '\\\"')
+        code = "val sprk_sql = spark.sql(\"" + escapedSQL + "\")\nval sprk_res=sprk_sql.collect\n%json sprk_res"  # .format(escapedSQL)
 
         # TODO: since the above code is not changed to sending direct SQL to the livy backend, client side string escaping is probably not needed
-        code = sql
+        # code = sql
 
         # print(code)
 
@@ -144,10 +144,12 @@ class LivyCursor:
     def _getLivyResult(self, res_obj):
         json_res = res_obj.json()
 
+        # print("_getLivyResult - json_res", json_res)
+
         while True:
             res = requests.get(self.connect_url + '/sessions/' + self.session_id + '/statements/' + repr(json_res['id']), headers=self.headers, auth=self.auth).json()
 
-            # print(res)
+            # print("_getLivyResult - res", res)
 
             if res['state'] == 'available':
                 return res
@@ -181,11 +183,11 @@ class LivyCursor:
         res = self._getLivyResult(self._submitLivyCode(self._getLivySQL(sql)))
         
         if (res['output']['status'] == 'ok'):
-            # values = res['output']['data']['application/json']
             values = res['output']['data']['application/json']
+            # values = res['output']['data']['application/json']
             if (len(values) >= 1):
-                self._rows = values['data'] # values[0]['values']
-                self._schema = values['schema']['fields'] # values[0]['schema']
+                self._rows = values[0]['values'] # values['data'] # values[0]['values']
+                self._schema = values[0]['schema'] # values['schema']['fields'] # values[0]['schema']
                 # print("rows", self._rows)
                 # print("schema", self._schema)
             else:
@@ -281,7 +283,7 @@ class LivyConnectionManager:
 
         # the following opens an spark / sql session
         data = {
-            'kind': 'sql' # 'spark'
+            'kind': 'spark' # 'sql' # 'spark'
         }
 
         headers = {
