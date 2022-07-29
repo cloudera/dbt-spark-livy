@@ -30,7 +30,7 @@ with open(os.path.join(this_directory, "README.md"), "r", encoding="utf8") as f:
 
 # get this package's version from dbt/adapters/<name>/__version__.py
 def _get_plugin_version_dict():
-    _version_path = os.path.join(this_directory, "dbt", "adapters", "spark", "__version__.py")
+    _version_path = os.path.join(this_directory, "dbt", "adapters", "spark_livy", "__version__.py")
     _semver = r"""(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"""
     _pre = r"""((?P<prekind>a|b|rc)(?P<pre>\d+))?"""
     _version_pattern = fr"""version\s*=\s*["']{_semver}{_pre}["']"""
@@ -50,7 +50,6 @@ def _get_dbt_core_version():
 
 
 package_name = "dbt-spark-livy"
-# make sure this always matches dbt/adapters/dbt-spark-livy/__version__.py
 package_version = "1.1.2"
 dbt_core_version = _get_dbt_core_version()
 description = """The dbt-spark-livy adapter plugin for Spark in Cloudera DataHub with Livy interface"""
@@ -78,6 +77,8 @@ setup(
     install_requires=[
         "dbt-core~={}".format(dbt_core_version),
         "sqlparams>=3.0.0",
+        "requests>=2.28.1",
+        "requests-toolbelt>=0.9.1"
         "python-decouple>=3.6"
     ],
     extras_require={
@@ -97,6 +98,5 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
-
     python_requires=">=3.7",
 )
