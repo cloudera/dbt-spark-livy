@@ -63,6 +63,7 @@ all_extras = odbc_extras + pyhive_extras + session_extras
 setup(
     name=package_name,
     version=package_version,
+    description=description,
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Cloudera",
@@ -72,20 +73,27 @@ setup(
     data_files=[('', ['dbt/adapters/spark_livy/.env'])],
     include_package_data=True,
     install_requires=[
-        "dbt-core>=1.1.0",
-        "pyspark",
-        "sqlparams",
-        "python-decouple>=3.6"
+        "dbt-core~={}".format(dbt_core_version),
+        "sqlparams>=3.0.0",
+        "requests>=2.28.1",
+        "requests-toolbelt>=0.9.1"
     ],
+    extras_require={
+        "ODBC": odbc_extras,
+        "PyHive": pyhive_extras,
+        "session": session_extras,
+        "all": all_extras,
+    },
+    zip_safe=False,
     classifiers=[
-        "Development Status :: 4 - Beta",
-        "Operating System :: MacOS :: MacOS X",
+        "Development Status :: 5 - Production/Stable",
+        "License :: OSI Approved :: Apache Software License",
         "Operating System :: Microsoft :: Windows",
+        "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX :: Linux",
+        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
-        "License :: OSI Approved :: Apache Software License"
     ],
-    zip_safe=False,
     python_requires=">=3.7",
 )
