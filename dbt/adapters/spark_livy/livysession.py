@@ -289,7 +289,12 @@ class LivyConnectionManager:
         }
 
         # Create sessions
-        session_id = str(requests.post(connect_url + '/sessions', data=json.dumps(data), headers=headers, auth=auth).json()['id'])
+        logger.debug("LivyConnectionManager.connect [open-url] {}".format(connect_url + '/sessions'))
+        logger.debug("LivyConnectionManager.connect [open-headers] {}".format(json.dumps(data)))
+        logger.debug("LivyConnectionManager.connect [open-auth] {}".format(auth))
+        session_req = requests.post(connect_url + '/sessions', data=json.dumps(data), headers=headers, auth=auth)
+        logger.debug("LivyConnectionManager.connect [done] {}".format(session_req.text))
+        session_id = str(session_req.json()['id'])
 
         # Wait for started state
         while True:
@@ -300,8 +305,7 @@ class LivyConnectionManager:
                 print("ERROR, cannot create a livy interactive session")
                 raise dbt.exceptions.FailedToConnectException(
                         'failed to connect'
-                    ) 
-                return
+                    )
 
             time.sleep(DEFAULT_POLL_WAIT)
 

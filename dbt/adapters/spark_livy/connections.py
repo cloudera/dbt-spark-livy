@@ -478,7 +478,13 @@ class SparkConnectionManager(SQLConnectionManager):
                     )
                 break
             except Exception as e:
+                import traceback
+        
                 exc = e
+                print(exc)
+                traceback.print_exc(exc)
+                logger.debug("Connection error: {}".format("".join(traceback.format_exception(type(exc), exc, exc.__traceback__))))
+
                 if isinstance(e, EOFError):
                     # The user almost certainly has invalid credentials.
                     # Perhaps a token expired, or something
