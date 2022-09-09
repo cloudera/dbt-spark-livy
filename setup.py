@@ -77,6 +77,7 @@ setup(
     install_requires=[
         "dbt-core~={}".format(dbt_core_version),
         "sqlparams>=3.0.0",
+        "requests_kerberos==0.14"
     ],
     extras_require={
         "ODBC": odbc_extras,

@@ -15,6 +15,7 @@
 """Spark Livy session integration."""
 
 from __future__ import annotations
+from cmath import log
 
 import json
 import time 
@@ -27,6 +28,8 @@ from typing import Any
 import dbt.exceptions
 from dbt.events import AdapterLogger
 from dbt.utils import DECIMALS
+
+from requests_kerberos import HTTPKerberosAuth
 
 logger = AdapterLogger("Spark")
 NUMBERS = DECIMALS + (int, float)
@@ -276,8 +279,13 @@ class LivyConnection:
 
 class LivyConnectionManager:
     
-    def connect(self, connect_url, user, password):
-        auth = requests.auth.HTTPBasicAuth(user, password)
+    def connect(self, connect_url, user, password, auth_type):
+        if auth_type and auth_type.lower() == "kerberos":
+            logger.debug("Using Kerberos auth")
+            auth = HTTPKerberosAuth()
+        else:
+            logger.debug("Using HTTP auth")
+            auth = requests.auth.HTTPBasicAuth(user, password)
 
         # the following opens an spark / sql session
         data = {

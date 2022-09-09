@@ -156,7 +156,10 @@ class SparkCredentials(Credentials):
         return self.host
 
     def _connection_keys(self):
-        return ("host", "port", "cluster", "endpoint", "schema", "organization")
+        if (self.method == SparkConnectionMethod.LIVY):
+          return ("host", "auth", "schema")
+        else:
+          return ("host", "port", "cluster", "endpoint", "schema", "organization")
 
 
 class PyhiveConnectionWrapper(object):
@@ -455,7 +458,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     handle = SessionConnectionWrapper(Connection())
                 elif creds.method == SparkConnectionMethod.LIVY:
                     # connect to livy interactive session
-                    handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password))
+                    handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.auth))
 
                     try:
                         if (creds.usage_tracking):
