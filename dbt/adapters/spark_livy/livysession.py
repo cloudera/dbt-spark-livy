@@ -290,6 +290,7 @@ class LivyConnectionManager:
         }
 
         # Create sessions
+        response = None
         try:
             response = requests.post(connect_url + '/sessions', data=json.dumps(data), headers=headers, auth=auth)
             response.raise_for_status()
@@ -305,7 +306,11 @@ class LivyConnectionManager:
         if response is None:
             raise Exception("Invalid response from livy server")
 
-        session_id = str(response.json()['id'])
+        session_id = None
+        try:
+            session_id = str(response.json()['id'])
+        except requests.exceptions.JSONDecodeError as json_err:
+            raise Exception("Json decode error to get session_id") from json_err
 
         # Wait for started state
         while True:
