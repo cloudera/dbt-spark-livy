@@ -85,6 +85,7 @@ class SparkCredentials(Credentials):
     retry_all: bool = False
     password: Optional[str] = None
     usage_tracking: Optional[bool] = True
+    livy_session_parameters: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def __pre_deserialize__(cls, data):
@@ -453,7 +454,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     handle = SessionConnectionWrapper(Connection())
                 elif creds.method == SparkConnectionMethod.LIVY:
                     # connect to livy interactive session
-                    handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password))
+                    handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.livy_session_parameters))
 
                     try:
                         if (creds.usage_tracking):
