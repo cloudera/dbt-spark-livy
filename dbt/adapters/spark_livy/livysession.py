@@ -246,11 +246,12 @@ class LivyConnection:
     https://github.com/mkleehammer/pyodbc/wiki/Connection
     """
 
-    def __init__(self, connect_url, session_id, auth, headers) -> None:
+    def __init__(self, connect_url, session_id, auth, headers, session_params) -> None:
         self.connect_url = connect_url
         self.session_id = session_id
         self.auth = auth
         self.headers = headers
+        self.session_params = session_params
 
     def get_session_id(self):
         return self.session_id
@@ -277,12 +278,13 @@ class LivyConnection:
 
 class LivyConnectionManager:
     
-    def connect(self, connect_url, user, password):
+    def connect(self, connect_url, user, password, session_params):
         auth = requests.auth.HTTPBasicAuth(user, password)
 
         # the following opens an spark / sql session
         data = {
-            'kind': 'sql' # 'spark'
+            'kind': 'sql', # 'spark'
+            'conf': session_params
         }
 
         headers = {
@@ -326,7 +328,7 @@ class LivyConnectionManager:
 
             time.sleep(DEFAULT_POLL_WAIT)
 
-        livyConnection = LivyConnection(connect_url, session_id, auth, headers)
+        livyConnection = LivyConnection(connect_url, session_id, auth, headers, session_params)
 
         return livyConnection
 
