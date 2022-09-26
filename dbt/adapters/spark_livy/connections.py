@@ -87,6 +87,7 @@ class SparkCredentials(Credentials):
     retry_all: bool = False
     password: Optional[str] = None
     usage_tracking: Optional[bool] = True
+    livy_session_parameters: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def __pre_deserialize__(cls, data):
@@ -160,7 +161,6 @@ class SparkCredentials(Credentials):
           return ("host", "auth", "schema")
         else:
           return ("host", "port", "cluster", "endpoint", "schema", "organization")
-
 
 class PyhiveConnectionWrapper(object):
     """Wrap a Spark connection in a way that no-ops transactions"""
@@ -458,23 +458,16 @@ class SparkConnectionManager(SQLConnectionManager):
                     handle = SessionConnectionWrapper(Connection())
                 elif creds.method == SparkConnectionMethod.LIVY:
                     # connect to livy interactive session
-                    handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.auth))
-
-                    try:
-                        if (creds.usage_tracking):
-                            tracking_data = {}
-                            payload = {}
-                            payload["id"] = "dbt_spark_livy_open"
-                            payload["unique_hash"] = hashlib.md5(creds.host.encode()).hexdigest()
-                            payload["auth"] = "livy"
-                            payload["connection_state"] = connection.state
-
-                            tracking_data["data"] = payload
-
-                            the_track_thread = threading.Thread(target=track_usage, kwargs={"data": tracking_data})
-                            the_track_thread.start()
-                    except:
-                        logger.debug("Usage tracking error")
+                    handle = LivySessionConnectionWrapper(
+                                 LivyConnectionManager()
+                                      .connect(
+                                           creds.host, 
+                                           creds.user, 
+                                           creds.password, 
+                                           creds.auth_type, 
+                                           creds.livy_session_parameters
+                                       )
+                             )
                 else:
                     raise dbt.exceptions.DbtProfileError(
                         f"invalid credential method: {creds.method}"
@@ -569,20 +562,3 @@ def _is_retryable_error(exc: Exception) -> Optional[str]:
     if 'temporarily_unavailable' in message:
         return exc.message
     return None
-
-# usage tracking code - Cloudera specific
-def track_usage(data):
-   import requests
-   from decouple import config
-
-   SNOWPLOW_ENDPOINT = config('SNOWPLOW_ENDPOINT')
-   SNOWPLOW_TIMEOUT  = int(config('SNOWPLOW_TIMEOUT')) # 10 seconds
-
-   # prod creds
-   headers = {'x-api-key': config('SNOWPLOW_API_KEY'), 'x-datacoral-environment': config('SNOWPLOW_ENNV'), 'x-datacoral-passthrough': 'true'}
-
-   data = json.dumps([data])
-
-   res = requests.post(SNOWPLOW_ENDPOINT, data = data, headers = headers, timeout = SNOWPLOW_TIMEOUT)
-
-   return res

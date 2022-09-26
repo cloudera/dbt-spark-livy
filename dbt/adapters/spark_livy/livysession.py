@@ -20,6 +20,7 @@ from cmath import log
 import json
 import time 
 import requests
+from urllib import response
 
 import datetime as dt
 from types import TracebackType
@@ -248,11 +249,12 @@ class LivyConnection:
     https://github.com/mkleehammer/pyodbc/wiki/Connection
     """
 
-    def __init__(self, connect_url, session_id, auth, headers) -> None:
+    def __init__(self, connect_url, session_id, auth, headers, session_params) -> None:
         self.connect_url = connect_url
         self.session_id = session_id
         self.auth = auth
         self.headers = headers
+        self.session_params = session_params
 
     def get_session_id(self):
         return self.session_id
@@ -279,7 +281,7 @@ class LivyConnection:
 
 class LivyConnectionManager:
     
-    def connect(self, connect_url, user, password, auth_type):
+    def connect(self, connect_url, user, password, auth_type, session_params):
         if auth_type and auth_type.lower() == "kerberos":
             logger.debug("Using Kerberos auth")
             auth = HTTPKerberosAuth()
@@ -289,7 +291,8 @@ class LivyConnectionManager:
 
         # the following opens an spark / sql session
         data = {
-            'kind': 'sql' # 'spark'
+            'kind': 'sql', # 'spark'
+            'conf': session_params
         }
 
         headers = {
@@ -297,7 +300,27 @@ class LivyConnectionManager:
         }
 
         # Create sessions
-        session_id = str(requests.post(connect_url + '/sessions', data=json.dumps(data), headers=headers, auth=auth).json()['id'])
+        response = None
+        try:
+            response = requests.post(connect_url + '/sessions', data=json.dumps(data), headers=headers, auth=auth)
+            response.raise_for_status()
+        except requests.exceptions.ConnectionError as c_err:
+            print("Connection Error :", c_err)
+        except requests.exceptions.HTTPError as h_err:
+            print("Http Error: ", h_err)
+        except requests.exceptions.Timeout as t_err:
+            print("Timeout Error: ", t_err)
+        except requests.exceptions.RequestException as a_err:
+            print("Authorization Error: ", a_err)
+
+        if response is None:
+            raise Exception("Invalid response from livy server")
+
+        session_id = None
+        try:
+            session_id = str(response.json()['id'])
+        except requests.exceptions.JSONDecodeError as json_err:
+            raise Exception("Json decode error to get session_id") from json_err
 
         # Wait for started state
         while True:
@@ -313,7 +336,7 @@ class LivyConnectionManager:
 
             time.sleep(DEFAULT_POLL_WAIT)
 
-        livyConnection = LivyConnection(connect_url, session_id, auth, headers)
+        livyConnection = LivyConnection(connect_url, session_id, auth, headers, session_params)
 
         return livyConnection
 
