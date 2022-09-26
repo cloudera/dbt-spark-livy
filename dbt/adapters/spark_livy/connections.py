@@ -153,7 +153,7 @@ class SparkCredentials(Credentials):
         return self.host
 
     def _connection_keys(self):
-        return ("host", "port", "cluster", "endpoint", "schema", "organization")
+        return "host", "port", "cluster", "endpoint", "schema", "organization"
 
 
 class PyhiveConnectionWrapper(object):
@@ -454,22 +454,6 @@ class SparkConnectionManager(SQLConnectionManager):
                 elif creds.method == SparkConnectionMethod.LIVY:
                     # connect to livy interactive session
                     handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.livy_session_parameters))
-
-                    try:
-                        if (creds.usage_tracking):
-                            tracking_data = {}
-                            payload = {}
-                            payload["id"] = "dbt_spark_livy_open"
-                            payload["unique_hash"] = hashlib.md5(creds.host.encode()).hexdigest()
-                            payload["auth"] = "livy"
-                            payload["connection_state"] = connection.state
-
-                            tracking_data["data"] = payload
-
-                            the_track_thread = threading.Thread(target=track_usage, kwargs={"data": tracking_data})
-                            the_track_thread.start()
-                    except:
-                        logger.debug("Usage tracking error")
                 else:
                     raise dbt.exceptions.DbtProfileError(
                         f"invalid credential method: {creds.method}"
@@ -564,20 +548,3 @@ def _is_retryable_error(exc: Exception) -> Optional[str]:
     if 'temporarily_unavailable' in message:
         return exc.message
     return None
-
-# usage tracking code - Cloudera specific
-def track_usage(data):
-   import requests
-   from decouple import config
-
-   SNOWPLOW_ENDPOINT = config('SNOWPLOW_ENDPOINT')
-   SNOWPLOW_TIMEOUT  = int(config('SNOWPLOW_TIMEOUT')) # 10 seconds
-
-   # prod creds
-   headers = {'x-api-key': config('SNOWPLOW_API_KEY'), 'x-datacoral-environment': config('SNOWPLOW_ENNV'), 'x-datacoral-passthrough': 'true'}
-
-   data = json.dumps([data])
-
-   res = requests.post(SNOWPLOW_ENDPOINT, data = data, headers = headers, timeout = SNOWPLOW_TIMEOUT)
-
-   return res
