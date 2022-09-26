@@ -155,7 +155,7 @@ class SparkCredentials(Credentials):
         return self.host
 
     def _connection_keys(self):
-        return ("host", "port", "cluster", "endpoint", "schema", "organization")
+        return "host", "port", "cluster", "endpoint", "schema", "organization"
 
 
 class PyhiveConnectionWrapper(object):
@@ -455,22 +455,6 @@ class SparkConnectionManager(SQLConnectionManager):
                 elif creds.method == SparkConnectionMethod.LIVY:
                     # connect to livy interactive session
                     handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.livy_session_parameters))
-
-                    try:
-                        if (creds.usage_tracking):
-                            tracking_data = {}
-                            payload = {}
-                            payload["id"] = "dbt_spark_livy_open"
-                            payload["unique_hash"] = hashlib.md5(creds.host.encode()).hexdigest()
-                            payload["auth"] = "livy"
-                            payload["connection_state"] = connection.state
-
-                            tracking_data["data"] = payload
-
-                            the_track_thread = threading.Thread(target=track_usage, kwargs={"data": tracking_data})
-                            the_track_thread.start()
-                    except:
-                        logger.debug("Usage tracking error")
                 else:
                     raise dbt.exceptions.DbtProfileError(
                         f"invalid credential method: {creds.method}"
