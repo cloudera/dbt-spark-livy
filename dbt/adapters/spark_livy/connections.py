@@ -92,8 +92,6 @@ class SparkCredentials(Credentials):
     usage_tracking: Optional[bool] = True
     livy_session_parameters: Dict[str, Any] = field(default_factory=dict)
 
-    _ALIASES = {"pass": "password", "user": "username"}
-
     @classmethod
     def __pre_deserialize__(cls, data):
         data = super().__pre_deserialize__(data)
@@ -102,6 +100,14 @@ class SparkCredentials(Credentials):
         return data
 
     def __post_init__(self):
+        
+        # get platform information for tracking
+        tracker.populate_platform_info(self, ver)
+        # get cml information for tracking
+        tracker.populate_cml_info()
+        # generate unique ids for tracking
+        tracker.populate_unique_ids(self)
+
         # spark classifies database and schema as the same thing
         if self.database is not None and self.database != self.schema:
             raise dbt.exceptions.RuntimeException(
@@ -153,12 +159,6 @@ class SparkCredentials(Credentials):
                     f"ImportError({e.msg})"
                 ) from e
 
-        # get platform information for tracking
-        tracker.populate_platform_info(self, ver)
-        # get cml information for tracking
-        tracker.populate_cml_info()
-        # generate unique ids for tracking
-        tracker.populate_unique_ids(self)
 
     @property
     def type(self):
