@@ -9,6 +9,9 @@ import threading
 import hashlib
 
 import dbt.exceptions
+import dbt.adapters.spark_livy.__version__ as ver
+import dbt.adapters.spark_livy.cloudera_tracking as tracker
+
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import ConnectionState, AdapterResponse
@@ -89,6 +92,8 @@ class SparkCredentials(Credentials):
     usage_tracking: Optional[bool] = True
     livy_session_parameters: Dict[str, Any] = field(default_factory=dict)
 
+    _ALIASES = {"pass": "password", "user": "username"}
+
     @classmethod
     def __pre_deserialize__(cls, data):
         data = super().__pre_deserialize__(data)
@@ -147,6 +152,13 @@ class SparkCredentials(Credentials):
                     "`pip install dbt-spark[session]`\n\n"
                     f"ImportError({e.msg})"
                 ) from e
+
+        # get platform information for tracking
+        tracker.populate_platform_info(self, ver)
+        # get cml information for tracking
+        tracker.populate_cml_info()
+        # generate unique ids for tracking
+        tracker.populate_unique_ids(self)
 
     @property
     def type(self):
