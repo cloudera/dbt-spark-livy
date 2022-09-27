@@ -88,7 +88,7 @@ def populate_cml_info():
 
 def populate_unique_ids(cred: Credentials):
     host = str(cred.host).encode()
-    user = str(cred.username).encode()
+    user = str(cred.user).encode()
     timestamp = str(time.time()).encode()
 
     # dbt invocation id
