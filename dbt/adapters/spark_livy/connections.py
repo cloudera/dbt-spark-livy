@@ -9,6 +9,9 @@ import threading
 import hashlib
 
 import dbt.exceptions
+import dbt.adapters.spark_livy.__version__ as ver
+import dbt.adapters.spark_livy.cloudera_tracking as tracker
+
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
 from dbt.contracts.connection import ConnectionState, AdapterResponse
@@ -97,6 +100,14 @@ class SparkCredentials(Credentials):
         return data
 
     def __post_init__(self):
+        
+        # get platform information for tracking
+        tracker.populate_platform_info(self, ver)
+        # get cml information for tracking
+        tracker.populate_cml_info()
+        # generate unique ids for tracking
+        tracker.populate_unique_ids(self)
+
         # spark classifies database and schema as the same thing
         if self.database is not None and self.database != self.schema:
             raise dbt.exceptions.RuntimeException(
@@ -147,6 +158,7 @@ class SparkCredentials(Credentials):
                     "`pip install dbt-spark[session]`\n\n"
                     f"ImportError({e.msg})"
                 ) from e
+
 
     @property
     def type(self):
