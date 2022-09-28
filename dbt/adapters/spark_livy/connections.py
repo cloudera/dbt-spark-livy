@@ -2,11 +2,8 @@ import os
 
 from contextlib import contextmanager
 
-import requests
 import json
 import time
-import threading
-import hashlib
 
 import dbt.exceptions
 import dbt.adapters.spark_livy.__version__ as ver
@@ -14,8 +11,10 @@ import dbt.adapters.spark_livy.cloudera_tracking as tracker
 
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import ConnectionState, AdapterResponse
+from dbt.contracts.connection import ConnectionState, AdapterResponse, Connection
+from dbt.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
 from dbt.events import AdapterLogger
+from dbt.events.functions import fire_event
 from dbt.utils import DECIMALS
 from dbt.adapters.spark_livy import __version__
 from dbt.adapters.spark_livy.livysession import LivyConnection, LivySessionConnectionWrapper, LivyConnectionManager
@@ -38,7 +37,7 @@ import sqlparams
 
 from hologram.helpers import StrEnum
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 try:
     from thrift.transport.TSSLSocket import TSSLSocket
@@ -510,6 +509,84 @@ class SparkConnectionManager(SQLConnectionManager):
         connection.handle = handle
         connection.state = ConnectionState.OPEN
         return connection
+
+
+    def add_query(
+        self,
+        sql: str,
+        auto_begin: bool = True,
+        bindings: Optional[Any] = None,
+        abridge_sql_log: bool = False,
+    ) -> Tuple[Connection, Any]:
+        connection = self.get_thread_connection()
+        if auto_begin and connection.transaction_open is False:
+            self.begin()
+        fire_event(ConnectionUsed(conn_type=self.TYPE, conn_name=connection.name))
+
+        additional_info = {}
+        if self.query_header:
+            try:
+                additional_info = json.loads(self.query_header.comment.query_comment.strip())
+            except Exception as ex:  # silently ignore error for parsing
+                additional_info = {}
+                logger.debug(f"Unable to get query header {ex}")
+
+        with self.exception_handler(sql):
+            if abridge_sql_log:
+                log_sql = "{}...".format(sql[:512])
+            else:
+                log_sql = sql
+
+            # track usage
+            payload = {
+                "event_type": "dbt_spark_livy_start_query",
+                "sql": log_sql,
+                "profile_name": self.profile.profile_name
+            }
+
+            for key, value in additional_info.items():
+                payload[key] = value
+
+            tracker.track_usage(payload)
+
+            fire_event(SQLQuery(conn_name=connection.name, sql=log_sql))
+            pre = time.time()
+
+            query_exception = None
+
+            cursor = connection.handle.cursor()
+            
+            try:
+                cursor.execute(sql, bindings)
+                query_status = str(self.get_response(cursor))
+            except Exception as ex:
+                query_status = str(ex)
+                query_exception = ex
+
+            elapsed_time = time.time() - pre
+
+            payload = {
+                "event_type": "dbt_spark_livy_end_query",
+                "sql": log_sql,
+                "elapsed_time": "{:.2f}".format(elapsed_time),
+                "status": query_status,
+                "profile_name": self.profile.profile_name
+            }
+
+            tracker.track_usage(payload)
+
+            # re-raise query exception so that it propogates to dbt
+            if (query_exception):
+                raise query_exception
+
+            fire_event(
+                SQLQueryStatus(
+                    status=str(self.get_response(cursor)),
+                    elapsed=round(elapsed_time, 2),
+                )
+            )
+
+            return connection, cursor
 
 
 def build_ssl_transport(host, port, username, auth, kerberos_service_name, password=None):
