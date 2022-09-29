@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from dbt.adapters.base.relation import BaseRelation, Policy
 from dbt.exceptions import RuntimeException
+import dbt.adapters.spark_livy.cloudera_tracking as tracker
 
 
 @dataclass
@@ -32,6 +33,15 @@ class SparkRelation(BaseRelation):
     def __post_init__(self):
         if self.database != self.schema and self.database:
             raise RuntimeException("Cannot set database in spark!")
+        if self.type:
+            tracker.track_usage(
+                {
+                    "event_type": "dbt_spark_livy_model_access",
+                    "model_name": self.render(),
+                    "model_type": self.type,
+                    "incremental_strategy": "",
+                }
+            )
 
     def render(self):
         if self.include_policy.database and self.include_policy.schema:
@@ -40,3 +50,14 @@ class SparkRelation(BaseRelation):
                 "include, but only one can be set"
             )
         return super().render()
+
+    def log_relation(self, incremental_strategy):
+        if self.type:
+            tracker.track_usage(
+                {
+                    "event_type": "dbt_spark_livy_new_incremental",
+                    "model_name": self.render(),
+                    "model_type": self.type,
+                    "incremental_strategy": incremental_strategy,
+                }
+            )
