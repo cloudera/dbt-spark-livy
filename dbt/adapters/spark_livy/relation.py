@@ -33,6 +33,7 @@ class SparkRelation(BaseRelation):
         if self.database != self.schema and self.database:
             raise RuntimeException("Cannot set database in spark!")
         if self.type:
+            print("tapas relation", self.type)
             tracker.track_usage(
                 {
                     "event_type": "dbt_impala_model_access",
