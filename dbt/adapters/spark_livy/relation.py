@@ -36,7 +36,7 @@ class SparkRelation(BaseRelation):
         if self.type:
             tracker.track_usage(
                 {
-                    "event_type": "dbt_impala_model_access",
+                    "event_type": "dbt_spark_livy_model_access",
                     "model_name": self.render(),
                     "model_type": self.type,
                     "incremental_strategy": "",
@@ -55,7 +55,7 @@ class SparkRelation(BaseRelation):
         if self.type:
             tracker.track_usage(
                 {
-                    "event_type": "dbt_impala_new_incremental",
+                    "event_type": "dbt_spark_livy_new_incremental",
                     "model_name": self.render(),
                     "model_type": self.type,
                     "incremental_strategy": incremental_strategy,
