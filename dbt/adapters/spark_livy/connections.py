@@ -478,7 +478,7 @@ class SparkConnectionManager(SQLConnectionManager):
                                 creds.host,
                                 creds.user,
                                 creds.password,
-                                creds.auth_type,
+                                creds.auth,
                                 creds.livy_session_parameters
                             )
                         )
