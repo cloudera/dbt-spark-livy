@@ -9,10 +9,15 @@ import threading
 import hashlib
 
 import dbt.exceptions
+import dbt.adapters.spark_livy.__version__ as ver
+import dbt.adapters.spark_livy.cloudera_tracking as tracker
+
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import ConnectionState, AdapterResponse
+from dbt.contracts.connection import ConnectionState, AdapterResponse, Connection
+from dbt.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
 from dbt.events import AdapterLogger
+from dbt.events.functions import fire_event
 from dbt.utils import DECIMALS
 from dbt.adapters.spark_livy import __version__
 from dbt.adapters.spark_livy.livysession import LivyConnection, LivySessionConnectionWrapper, LivyConnectionManager
@@ -35,7 +40,7 @@ import sqlparams
 
 from hologram.helpers import StrEnum
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 try:
     from thrift.transport.TSSLSocket import TSSLSocket
@@ -97,6 +102,14 @@ class SparkCredentials(Credentials):
         return data
 
     def __post_init__(self):
+        
+        # get platform information for tracking
+        tracker.populate_platform_info(self, ver)
+        # get cml information for tracking
+        tracker.populate_cml_info()
+        # generate unique ids for tracking
+        tracker.populate_unique_ids(self)
+
         # spark classifies database and schema as the same thing
         if self.database is not None and self.database != self.schema:
             raise dbt.exceptions.RuntimeException(
@@ -147,6 +160,7 @@ class SparkCredentials(Credentials):
                     "`pip install dbt-spark[session]`\n\n"
                     f"ImportError({e.msg})"
                 ) from e
+
 
     @property
     def type(self):
@@ -458,7 +472,10 @@ class SparkConnectionManager(SQLConnectionManager):
                     handle = SessionConnectionWrapper(Connection())
                 elif creds.method == SparkConnectionMethod.LIVY:
                     # connect to livy interactive session
-                    handle = LivySessionConnectionWrapper(
+                    connection_start_time = time.time()
+                    connection_ex = None
+                    try:
+                        handle = LivySessionConnectionWrapper(
                                  LivyConnectionManager()
                                       .connect(
                                            creds.host, 
@@ -468,6 +485,33 @@ class SparkConnectionManager(SQLConnectionManager):
                                            creds.livy_session_parameters
                                        )
                              )
+                        connection_end_time = time.time()
+                        connection.state = ConnectionState.OPEN
+                    except Exception as ex:
+                        logger.debug("Connection error: {}".format(ex))
+                        connection_ex = ex
+                        connection_end_time = time.time()
+                        connection.state = ConnectionState.FAIL
+
+                    # track usage
+                    payload = {
+                        "event_type": "dbt_spark_livy_open",
+                        "auth": "livy",
+                        "connection_state": connection.state,
+                        "elapsed_time": "{:.2f}".format(
+                            connection_end_time - connection_start_time
+                        ),
+                    }
+
+                    if connection.state == ConnectionState.FAIL:
+                        payload["connection_exception"] = "{}".format(connection_ex)
+                        tracker.track_usage(payload)
+                        raise connection_ex
+                    else:
+                        tracker.track_usage(payload)
+
+                    if (connection_ex):
+                        raise connection_ex
                 else:
                     raise dbt.exceptions.DbtProfileError(
                         f"invalid credential method: {creds.method}"
@@ -509,6 +553,109 @@ class SparkConnectionManager(SQLConnectionManager):
         connection.handle = handle
         connection.state = ConnectionState.OPEN
         return connection
+
+    @classmethod
+    def close(cls, connection):
+        try:
+            # if the connection is in closed or init, there's nothing to do
+            if connection.state in {ConnectionState.CLOSED, ConnectionState.INIT}:
+                return connection
+
+            connection_close_start_time = time.time()
+            connection = super().close(connection)
+            connection_close_end_time = time.time()
+
+            payload = {
+                "event_type": "dbt_spark_livy_close",
+                "connection_state": ConnectionState.CLOSED,
+                "elapsed_time": "{:.2f}".format(
+                    connection_close_end_time - connection_close_start_time
+                ),
+            }
+
+            tracker.track_usage(payload)
+
+            return connection
+        except Exception as err:
+            logger.debug(f"Error closing connection {err}")
+
+
+    def add_query(
+        self,
+        sql: str,
+        auto_begin: bool = True,
+        bindings: Optional[Any] = None,
+        abridge_sql_log: bool = False,
+    ) -> Tuple[Connection, Any]:
+        connection = self.get_thread_connection()
+        if auto_begin and connection.transaction_open is False:
+            self.begin()
+        fire_event(ConnectionUsed(conn_type=self.TYPE, conn_name=connection.name))
+
+        additional_info = {}
+        if self.query_header:
+            try:
+                additional_info = json.loads(self.query_header.comment.query_comment.strip())
+            except Exception as ex:  # silently ignore error for parsing
+                additional_info = {}
+                logger.debug(f"Unable to get query header {ex}")
+
+        with self.exception_handler(sql):
+            if abridge_sql_log:
+                log_sql = "{}...".format(sql[:512])
+            else:
+                log_sql = sql
+
+            # track usage
+            payload = {
+                "event_type": "dbt_spark_livy_start_query",
+                "sql": log_sql,
+                "profile_name": self.profile.profile_name
+            }
+
+            for key, value in additional_info.items():
+                payload[key] = value
+
+            tracker.track_usage(payload)
+
+            fire_event(SQLQuery(conn_name=connection.name, sql=log_sql))
+            pre = time.time()
+
+            query_exception = None
+
+            cursor = connection.handle.cursor()
+            
+            try:
+                cursor.execute(sql, bindings)
+                query_status = str(self.get_response(cursor))
+            except Exception as ex:
+                query_status = str(ex)
+                query_exception = ex
+
+            elapsed_time = time.time() - pre
+
+            payload = {
+                "event_type": "dbt_spark_livy_end_query",
+                "sql": log_sql,
+                "elapsed_time": "{:.2f}".format(elapsed_time),
+                "status": query_status,
+                "profile_name": self.profile.profile_name
+            }
+
+            tracker.track_usage(payload)
+
+            # re-raise query exception so that it propogates to dbt
+            if (query_exception):
+                raise query_exception
+
+            fire_event(
+                SQLQueryStatus(
+                    status=str(self.get_response(cursor)),
+                    elapsed=round(elapsed_time, 2),
+                )
+            )
+
+            return connection, cursor
 
 
 def build_ssl_transport(host, port, username, auth, kerberos_service_name, password=None):

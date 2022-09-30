@@ -14,9 +14,11 @@
 
   {% set on_schema_change = incremental_validate_on_schema_change(config.get('on_schema_change'), default='ignore') %}
 
-  {% set target_relation = this %}
+  {% set target_relation = this.incorporate(type='table') %}
   {% set existing_relation = load_relation(this) %}
   {% set tmp_relation = make_temp_relation(this) %}
+
+  {% do target_relation.log_relation(raw_strategy) %}
 
   {% if strategy == 'insert_overwrite' and partition_by %}
     {% call statement() %}
