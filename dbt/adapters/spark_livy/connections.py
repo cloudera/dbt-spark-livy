@@ -2,11 +2,8 @@ import os
 
 from contextlib import contextmanager
 
-import requests
 import json
 import time
-import threading
-import hashlib
 
 import dbt.exceptions
 import dbt.adapters.spark_livy.__version__ as ver
@@ -475,6 +472,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     connection_start_time = time.time()
                     connection_ex = None
                     try:
+<<<<<<< HEAD
                         handle = LivySessionConnectionWrapper(
                                  LivyConnectionManager()
                                       .connect(
@@ -485,6 +483,9 @@ class SparkConnectionManager(SQLConnectionManager):
                                            creds.livy_session_parameters
                                        )
                              )
+=======
+                        handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.livy_session_parameters))
+>>>>>>> main
                         connection_end_time = time.time()
                         connection.state = ConnectionState.OPEN
                     except Exception as ex:
