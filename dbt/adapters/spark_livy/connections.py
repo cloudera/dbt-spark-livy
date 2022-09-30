@@ -136,8 +136,8 @@ class SparkCredentials(Credentials):
             )
 
         if (
-                self.method == SparkConnectionMethod.HTTP
-                or self.method == SparkConnectionMethod.THRIFT
+            self.method == SparkConnectionMethod.HTTP
+            or self.method == SparkConnectionMethod.THRIFT
         ) and not (ThriftState and THttpClient and hive):
             raise dbt.exceptions.RuntimeException(
                 f"{self.method} connection method requires "
@@ -577,11 +577,11 @@ class SparkConnectionManager(SQLConnectionManager):
             logger.debug(f"Error closing connection {err}")
 
     def add_query(
-            self,
-            sql: str,
-            auto_begin: bool = True,
-            bindings: Optional[Any] = None,
-            abridge_sql_log: bool = False,
+        self,
+        sql: str,
+        auto_begin: bool = True,
+        bindings: Optional[Any] = None,
+        abridge_sql_log: bool = False,
     ) -> Tuple[Connection, Any]:
         connection = self.get_thread_connection()
         if auto_begin and connection.transaction_open is False:
