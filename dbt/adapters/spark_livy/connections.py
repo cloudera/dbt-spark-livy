@@ -95,7 +95,7 @@ class SparkCredentials(Credentials):
         return data
 
     def __post_init__(self):
-        
+
         # get platform information for tracking
         tracker.populate_platform_info(self, ver)
         # get cml information for tracking
@@ -154,7 +154,6 @@ class SparkCredentials(Credentials):
                     f"ImportError({e.msg})"
                 ) from e
 
-
     @property
     def type(self):
         return "spark_livy"
@@ -164,7 +163,10 @@ class SparkCredentials(Credentials):
         return self.host
 
     def _connection_keys(self):
-        return "host", "port", "cluster", "endpoint", "schema", "organization"
+        if self.method == SparkConnectionMethod.LIVY:
+            return "host", "auth", "schema"
+        else:
+            return "host", "port", "cluster", "endpoint", "schema", "organization"
 
 
 class PyhiveConnectionWrapper(object):
@@ -467,7 +469,16 @@ class SparkConnectionManager(SQLConnectionManager):
                     connection_start_time = time.time()
                     connection_ex = None
                     try:
-                        handle = LivySessionConnectionWrapper(LivyConnectionManager().connect(creds.host, creds.user, creds.password, creds.livy_session_parameters))
+                        handle = LivySessionConnectionWrapper(
+                            LivyConnectionManager()
+                            .connect(
+                                creds.host,
+                                creds.user,
+                                creds.password,
+                                creds.auth,
+                                creds.livy_session_parameters
+                            )
+                        )
                         connection_end_time = time.time()
                         connection.state = ConnectionState.OPEN
                     except Exception as ex:
@@ -493,7 +504,7 @@ class SparkConnectionManager(SQLConnectionManager):
                     else:
                         tracker.track_usage(payload)
 
-                    if (connection_ex):
+                    if connection_ex:
                         raise connection_ex
                 else:
                     raise dbt.exceptions.DbtProfileError(
@@ -562,7 +573,6 @@ class SparkConnectionManager(SQLConnectionManager):
         except Exception as err:
             logger.debug(f"Error closing connection {err}")
 
-
     def add_query(
         self,
         sql: str,
@@ -607,7 +617,7 @@ class SparkConnectionManager(SQLConnectionManager):
             query_exception = None
 
             cursor = connection.handle.cursor()
-            
+
             try:
                 cursor.execute(sql, bindings)
                 query_status = str(self.get_response(cursor))
@@ -628,7 +638,7 @@ class SparkConnectionManager(SQLConnectionManager):
             tracker.track_usage(payload)
 
             # re-raise query exception so that it propogates to dbt
-            if (query_exception):
+            if query_exception:
                 raise query_exception
 
             fire_event(
