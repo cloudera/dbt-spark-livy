@@ -139,7 +139,7 @@ class LivyCursor:
         # code = "val sprk_sql = spark.sql(\"" + escapedSQL + "\")\nval sprk_res=sprk_sql.collect\n%json sprk_res"  # .format(escapedSQL)
 
         # TODO: since the above code is not changed to sending direct SQL to the livy backend, client side string escaping is probably not needed
-        code = sql
+        code = sql.replace("\n", " ").replace("\t", " ")
 
         # print(code)
 
