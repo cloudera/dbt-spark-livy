@@ -9,7 +9,7 @@ import dbt.adapters.spark_livy.cloudera_tracking as tracker
 
 from dbt.adapters.base import Credentials
 from dbt.adapters.sql import SQLConnectionManager
-from dbt.contracts.connection import ConnectionState, AdapterResponse, Connection
+from dbt.contracts.connection import AdapterRequiredConfig, ConnectionState, AdapterResponse, Connection
 from dbt.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
 from dbt.events import AdapterLogger
 from dbt.events.functions import fire_event
@@ -296,6 +296,11 @@ class SparkConnectionManager(SQLConnectionManager):
     SPARK_CLUSTER_HTTP_PATH = "/sql/protocolv1/o/{organization}/{cluster}"
     SPARK_SQL_ENDPOINT_HTTP_PATH = "/sql/1.0/endpoints/{endpoint}"
     SPARK_CONNECTION_URL = "{host}:{port}" + SPARK_CLUSTER_HTTP_PATH
+
+    def __init__(self, profile: AdapterRequiredConfig):
+        super().__init__(profile)
+        # generate profile related object for instrumentation.
+        tracker.generate_profile_info(self)
 
     @contextmanager
     def exception_handler(self, sql):
