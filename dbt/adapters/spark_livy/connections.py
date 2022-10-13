@@ -86,6 +86,7 @@ class SparkCredentials(Credentials):
     password: Optional[str] = None
     usage_tracking: Optional[bool] = True
     livy_session_parameters: Dict[str, Any] = field(default_factory=dict)
+    verify_ssl_certificate: Optional[bool] = True
 
     @classmethod
     def __pre_deserialize__(cls, data):
@@ -481,7 +482,8 @@ class SparkConnectionManager(SQLConnectionManager):
                                 creds.user,
                                 creds.password,
                                 creds.auth,
-                                creds.livy_session_parameters
+                                creds.livy_session_parameters,
+                                creds.verify_ssl_certificate
                             )
                         )
                         connection_end_time = time.time()
