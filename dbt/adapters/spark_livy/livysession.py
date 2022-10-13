@@ -53,13 +53,14 @@ class LivyCursor:
         self.auth = None
         self.headers = None
 
-    def __init__(self, connect_url, session_id, auth, headers) -> None:
+    def __init__(self, connect_url, session_id, auth, headers, verify_ssl_certificate) -> None:
         self._rows = None
         self._schema = None
         self.connect_url = connect_url
         self.session_id = session_id
         self.auth = auth
         self.headers = headers
+        self.verify_ssl_certificate = verify_ssl_certificate
 
     def __enter__(self) -> LivyCursor:
         return self
@@ -119,13 +120,23 @@ class LivyCursor:
         # print("Closing the connection and livy session", self.session_id)
 
         # delete the session_id 
-        res = requests.delete(self.connect_url + '/sessions/' + self.session_id, headers=self.headers, auth=self.auth)
+        _ = requests.delete(
+            self.connect_url + '/sessions/' + self.session_id, 
+            headers=self.headers, 
+            auth=self.auth, 
+            verify=self.verify_ssl_certificate
+        )
 
     def _submitLivyCode(self, code):
         # Submit code
         data = {'code': code}
 
-        res = requests.post(self.connect_url + '/sessions/' + self.session_id + '/statements', data=json.dumps(data), headers=self.headers, auth=self.auth)
+        res = requests.post(self.connect_url + '/sessions/' + self.session_id + '/statements', 
+              data=json.dumps(data), 
+              headers=self.headers, 
+              auth=self.auth, 
+              verify=self.verify_ssl_certificate
+        )
 
         return res
 
@@ -149,7 +160,12 @@ class LivyCursor:
         json_res = res_obj.json()
 
         while True:
-            res = requests.get(self.connect_url + '/sessions/' + self.session_id + '/statements/' + repr(json_res['id']), headers=self.headers, auth=self.auth).json()
+            res = requests.get(
+                  self.connect_url + '/sessions/' + self.session_id + '/statements/' + repr(json_res['id']), 
+                  headers=self.headers, 
+                  auth=self.auth,
+                  verify=self.verify_ssl_certificate
+            ).json()
 
             # print(res)
 
@@ -249,12 +265,13 @@ class LivyConnection:
     https://github.com/mkleehammer/pyodbc/wiki/Connection
     """
 
-    def __init__(self, connect_url, session_id, auth, headers, session_params) -> None:
+    def __init__(self, connect_url, session_id, auth, headers, session_params, verify_ssl_certificate) -> None:
         self.connect_url = connect_url
         self.session_id = session_id
         self.auth = auth
         self.headers = headers
         self.session_params = session_params
+        self.verify_ssl_certificate = verify_ssl_certificate
 
     def get_session_id(self):
         return self.session_id
@@ -277,11 +294,11 @@ class LivyConnection:
         out : Cursor
             The cursor.
         """
-        return LivyCursor(self.connect_url, self.session_id, self.auth, self.headers)
+        return LivyCursor(self.connect_url, self.session_id, self.auth, self.headers, self.verify_ssl_certificate)
 
 class LivyConnectionManager:
     
-    def connect(self, connect_url, user, password, auth_type, session_params):
+    def connect(self, connect_url, user, password, auth_type, session_params, verify_ssl_certificate):
         if auth_type and auth_type.lower() == "kerberos":
             logger.debug("Using Kerberos auth")
             auth = HTTPKerberosAuth()
@@ -302,7 +319,12 @@ class LivyConnectionManager:
         # Create sessions
         response = None
         try:
-            response = requests.post(connect_url + '/sessions', data=json.dumps(data), headers=headers, auth=auth)
+            response = requests.post(
+                       connect_url + '/sessions', data=json.dumps(data), 
+                       headers=headers, 
+                       auth=auth, 
+                       verify=verify_ssl_certificate
+            )
             response.raise_for_status()
         except requests.exceptions.ConnectionError as c_err:
             print("Connection Error :", c_err)
@@ -324,7 +346,13 @@ class LivyConnectionManager:
 
         # Wait for started state
         while True:
-            res = requests.get(connect_url + '/sessions/' + session_id + '/state', headers=headers, auth=auth).json()
+            res = requests.get(
+                connect_url + '/sessions/' + session_id + '/state', 
+                headers=headers, 
+                auth=auth,
+                verify=verify_ssl_certificate
+            ).json()
+
             if res['state'] == 'idle':
                 break
             if res['state'] == 'dead':
@@ -336,7 +364,7 @@ class LivyConnectionManager:
 
             time.sleep(DEFAULT_POLL_WAIT)
 
-        livyConnection = LivyConnection(connect_url, session_id, auth, headers, session_params)
+        livyConnection = LivyConnection(connect_url, session_id, auth, headers, session_params, verify_ssl_certificate)
 
         return livyConnection
 
