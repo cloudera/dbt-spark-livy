@@ -418,8 +418,8 @@ class SparkAdapter(SQLAdapter):
             }
             tracker.track_usage(payload)
         except Exception as ex:
-            logger.error(
-                f"Failed to fetch warehouse version. Exception: {ex}"
+            logger.debug(
+                f"Warehouse version not available. Reason: {ex}"
             )
             payload = {
                 "event_type": "dbt_spark_livy_warehouse",
