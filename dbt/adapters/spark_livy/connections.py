@@ -99,8 +99,8 @@ class SparkCredentials(Credentials):
 
         # get platform information for tracking
         tracker.populate_platform_info(self, ver)
-        # get cml information for tracking
-        tracker.populate_cml_info()
+        # get dbt deployment env information for tracking
+        tracker.populate_dbt_deployment_env_info()
         # generate unique ids for tracking
         tracker.populate_unique_ids(self)
 
