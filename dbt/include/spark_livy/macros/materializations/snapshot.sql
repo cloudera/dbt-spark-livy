@@ -67,7 +67,7 @@
 {% endmacro %}
 
 
-{% materialization snapshot, adapter='spark' %}
+{% materialization snapshot, adapter='spark_livy' %}
   {%- set config = model['config'] -%}
 
   {%- set target_table = model.get('alias', model.get('name')) -%}
