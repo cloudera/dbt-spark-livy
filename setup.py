@@ -76,7 +76,7 @@ setup(
         "dbt-core~={}".format(dbt_core_version),
         "sqlparams>=3.0.0",
         "requests_kerberos==0.14",
-        "requests-toolbelt>=0.9.1"
+        "requests-toolbelt>=0.9.1",
         "python-decouple>=3.6"
     ],
     extras_require={
