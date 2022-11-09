@@ -39,6 +39,3 @@
 {% endmacro %}
 
 
-{% macro spark_livy__get_show_grant_sql(relation) %}
-    show grant on {{ relation }}
-{% endmacro %}
