@@ -414,5 +414,8 @@ class LivySessionConnectionWrapper(object):
             return float(value)
         elif isinstance(value, dt.datetime):
             return f"'{value.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}'"
+        elif value == None:
+            return "''"
         else:
             return f"'{value}'"
+

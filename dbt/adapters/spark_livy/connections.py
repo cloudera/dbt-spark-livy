@@ -14,7 +14,9 @@ from dbt.events.types import ConnectionUsed, SQLQuery, SQLQueryStatus
 from dbt.events import AdapterLogger
 from dbt.events.functions import fire_event
 from dbt.utils import DECIMALS
-from dbt.adapters.spark import __version__
+from dbt.adapters.spark_livy import __version__
+from dbt.adapters.spark_livy.livysession import LivyConnection, LivySessionConnectionWrapper, LivyConnectionManager
+from dbt.tracking import DBT_INVOCATION_ENV
 
 try:
     from TCLIService.ttypes import TOperationState as ThriftState
@@ -437,10 +439,9 @@ class SparkConnectionManager(SQLConnectionManager):
 
                     cls.validate_creds(creds, required_fields)
 
-                    dbt_spark_version = __version__.version
-                    user_agent_entry = (
-                        f"dbt-labs-dbt-spark/{dbt_spark_version} (Databricks)"  # noqa
-                    )
+                    dbt_spark_livy_version = __version__.version
+                    dbt_invocation_env = os.getenv(DBT_INVOCATION_ENV) or "manual"
+                    user_agent_entry = f"cloudera-dbt-spark-livy/{dbt_spark_livy_version} (Cloudera, {dbt_invocation_env})"  # noqa
 
                     # http://simba.wpengine.com/products/Spark/doc/ODBC_InstallGuide/unix/content/odbc/hi/configuring/serverside.htm
                     ssp = {f"SSP_{k}": f"{{{v}}}" for k, v in creds.server_side_parameters.items()}

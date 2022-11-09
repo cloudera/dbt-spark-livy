@@ -28,7 +28,7 @@ with open(os.path.join(this_directory, "README.md"), "r", encoding="utf8") as f:
 
 # get this package's version from dbt/adapters/<name>/__version__.py
 def _get_plugin_version_dict():
-    _version_path = os.path.join(this_directory, "dbt", "adapters", "spark", "__version__.py")
+    _version_path = os.path.join(this_directory, "dbt", "adapters", "spark_livy", "__version__.py")
     _semver = r"""(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)"""
     _pre = r"""((?P<prekind>a|b|rc)(?P<pre>\d+))?"""
     _version_pattern = fr"""version\s*=\s*["']{_semver}{_pre}["']"""
@@ -76,6 +76,7 @@ setup(
         "dbt-core~={}".format(dbt_core_version),
         "sqlparams>=3.0.0",
         "requests_kerberos==0.14",
+        "requests-toolbelt>=0.9.1"
         "python-decouple>=3.6"
     ],
     extras_require={
