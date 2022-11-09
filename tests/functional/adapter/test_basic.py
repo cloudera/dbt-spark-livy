@@ -50,7 +50,7 @@ class TestGenericTestsSpark(BaseGenericTests):
 
 # These tests were not enabled in the dbtspec files, so skipping here.
 # Error encountered was: Error running query: java.lang.ClassNotFoundException: delta.DefaultSource
-@pytest.mark.skip_profile('apache_spark', 'spark_session')
+@pytest.mark.skip_profile('apache_spark', 'spark_session', 'spark_livy')
 class TestSnapshotCheckColsSpark(BaseSnapshotCheckCols):
     @pytest.fixture(scope="class")
     def project_config_update(self):
@@ -66,7 +66,7 @@ class TestSnapshotCheckColsSpark(BaseSnapshotCheckCols):
 
 # These tests were not enabled in the dbtspec files, so skipping here.
 # Error encountered was: Error running query: java.lang.ClassNotFoundException: delta.DefaultSource
-@pytest.mark.skip_profile('apache_spark', 'spark_session')
+@pytest.mark.skip_profile('apache_spark', 'spark_session', 'spark_livy')
 class TestSnapshotTimestampSpark(BaseSnapshotTimestamp):
     @pytest.fixture(scope="class")
     def project_config_update(self):
@@ -80,6 +80,6 @@ class TestSnapshotTimestampSpark(BaseSnapshotTimestamp):
         }
 
 
-@pytest.mark.skip_profile('spark_session')
+@pytest.mark.skip_profile('spark_session', 'spark_livy')
 class TestBaseAdapterMethod(BaseAdapterMethod):
     pass
