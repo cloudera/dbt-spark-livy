@@ -13,11 +13,18 @@ Note: dbt-spark now supports Spark 3.1.1 (formerly on Spark 2.x).
 
 Python >= 3.8
 
-dbt-core >= 1.1.0
+dbt-core ~= 1.2.0
 
 pyspark
 
 sqlparams
+
+requests_kerberos
+
+requests-toolbelt
+
+python-decouple
+
 
 ### Installing dbt-spark-livy
 
