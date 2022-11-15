@@ -37,6 +37,102 @@ NUMBERS = DECIMALS + (int, float)
 
 DEFAULT_POLL_WAIT = 2
 
+class LivySession:
+    def __init__(self, connect_url, auth, headers, verify_ssl_certificate):
+        self.connect_url = connect_url
+        self.auth = auth
+        self.headers = headers
+        self.session_id = None
+        self.verify_ssl_certificate = verify_ssl_certificate
+    
+    def __enter__(self):
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: Exception | None,
+        exc_tb: TracebackType | None,
+    ) -> bool:
+        self.delete_session()
+        return True
+
+    def create_session(self, data):
+        # Create sessions
+        response = None
+        try:
+            response = requests.post(
+                       self.connect_url + '/sessions', data=json.dumps(data), 
+                       headers=self.headers, 
+                       auth=self.auth, 
+                       verify=self.verify_ssl_certificate
+            )
+            response.raise_for_status()
+        except requests.exceptions.ConnectionError as c_err:
+            print("Connection Error :", c_err)
+        except requests.exceptions.HTTPError as h_err:
+            print("Http Error: ", h_err)
+        except requests.exceptions.Timeout as t_err:
+            print("Timeout Error: ", t_err)
+        except requests.exceptions.RequestException as a_err:
+            print("Authorization Error: ", a_err)
+
+        if response is None:
+            raise Exception("Invalid response from livy server")
+
+        self.session_id = None
+        try:
+            self.session_id = str(response.json()['id'])
+        except requests.exceptions.JSONDecodeError as json_err:
+            raise Exception("Json decode error to get session_id") from json_err
+
+        # Wait for started state
+        while True:
+            res = requests.get(
+                self.connect_url + '/sessions/' + self.session_id + '/state', 
+                headers=self.headers, 
+                auth=self.auth,
+                verify=self.verify_ssl_certificate
+            ).json()
+
+            if res['state'] == 'idle':
+                break
+            if res['state'] == 'dead':
+                print("ERROR, cannot create a livy interactive session")
+                raise dbt.exceptions.FailedToConnectException(
+                        'failed to connect'
+                    ) 
+                return
+
+            time.sleep(DEFAULT_POLL_WAIT) 
+
+        logger.debug(f"Creating new livy session: {self.session_id}")
+
+        return self.session_id
+
+    def delete_session(self):
+        logger.debug(f"Closing the connection and livy session: {self.session_id}")
+
+        # delete the session_id 
+        _ = requests.delete(
+            self.connect_url + '/sessions/' + self.session_id, 
+            headers=self.headers, 
+            auth=self.auth, 
+            verify=self.verify_ssl_certificate
+        )
+
+    def is_valid_session(self):
+        res = requests.get(
+                self.connect_url + '/sessions/' + self.session_id + '/state', 
+                headers=self.headers, 
+                auth=self.auth,
+                verify=self.verify_ssl_certificate
+            ).json()
+
+        return res['state'] == 'idle'
+
+
+# cursor object - wrapped for livy API
 class LivyCursor:
     """
     Mock a pyodbc cursor.
@@ -116,17 +212,7 @@ class LivyCursor:
         https://github.com/mkleehammer/pyodbc/wiki/Cursor#close
         """
         self._rows = None
-
-        # print("Closing the connection and livy session", self.session_id)
-
-        # delete the session_id 
-        _ = requests.delete(
-            self.connect_url + '/sessions/' + self.session_id, 
-            headers=self.headers, 
-            auth=self.auth, 
-            verify=self.verify_ssl_certificate
-        )
-
+        
     def _submitLivyCode(self, code):
         # Submit code
         data = {'code': code}
@@ -255,7 +341,6 @@ class LivyCursor:
 
         return row
 
-
 class LivyConnection:
     """
     Mock a pyodbc connection.
@@ -272,6 +357,8 @@ class LivyConnection:
         self.headers = headers
         self.session_params = session_params
         self.verify_ssl_certificate = verify_ssl_certificate
+
+        self._cursor = LivyCursor(self.connect_url, self.session_id, self.auth, self.headers, self.verify_ssl_certificate) 
 
     def get_session_id(self):
         return self.session_id
@@ -294,10 +381,33 @@ class LivyConnection:
         out : Cursor
             The cursor.
         """
-        return LivyCursor(self.connect_url, self.session_id, self.auth, self.headers, self.verify_ssl_certificate)
+        return self._cursor
+
+    def close(self) -> None:
+        """
+        Close the connection.
+
+        Source
+        ------
+        https://github.com/mkleehammer/pyodbc/wiki/Cursor#close
+        """
+        logger.debug("Connection.close()")
+        self._cursor.close()
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: Exception | None,
+        exc_tb: TracebackType | None,
+    ) -> bool:
+        self.close()
+        return True
 
 class LivyConnectionManager:
-    
+
+    def __init__(self):
+        self.livy_global_session = None 
+
     def connect(self, connect_url, user, password, auth_type, session_params, verify_ssl_certificate):
         if auth_type and auth_type.lower() == "kerberos":
             logger.debug("Using Kerberos auth")
@@ -316,55 +426,23 @@ class LivyConnectionManager:
             'Content-Type': 'application/json'
         }
 
-        # Create sessions
-        response = None
-        try:
-            response = requests.post(
-                       connect_url + '/sessions', data=json.dumps(data), 
-                       headers=headers, 
-                       auth=auth, 
-                       verify=verify_ssl_certificate
-            )
-            response.raise_for_status()
-        except requests.exceptions.ConnectionError as c_err:
-            print("Connection Error :", c_err)
-        except requests.exceptions.HTTPError as h_err:
-            print("Http Error: ", h_err)
-        except requests.exceptions.Timeout as t_err:
-            print("Timeout Error: ", t_err)
-        except requests.exceptions.RequestException as a_err:
-            print("Authorization Error: ", a_err)
+        if (self.livy_global_session == None):
+            self.livy_global_session = LivySession(connect_url, auth, headers, verify_ssl_certificate)
+            self.livy_global_session.create_session(data)
+        elif not self.livy_global_session.is_valid_session():
+            self.livy_global_session.delete_session()
+            self.livy_global_session.create_session()
+        else:
+            logger.debug(f"Reusing session: {self.livy_global_session.session_id}")
 
-        if response is None:
-            raise Exception("Invalid response from livy server")
-
-        session_id = None
-        try:
-            session_id = str(response.json()['id'])
-        except requests.exceptions.JSONDecodeError as json_err:
-            raise Exception("Json decode error to get session_id") from json_err
-
-        # Wait for started state
-        while True:
-            res = requests.get(
-                connect_url + '/sessions/' + session_id + '/state', 
-                headers=headers, 
-                auth=auth,
-                verify=verify_ssl_certificate
-            ).json()
-
-            if res['state'] == 'idle':
-                break
-            if res['state'] == 'dead':
-                print("ERROR, cannot create a livy interactive session")
-                raise dbt.exceptions.FailedToConnectException(
-                        'failed to connect'
-                    ) 
-                return
-
-            time.sleep(DEFAULT_POLL_WAIT)
-
-        livyConnection = LivyConnection(connect_url, session_id, auth, headers, session_params, verify_ssl_certificate)
+        livyConnection = LivyConnection(
+                            connect_url, 
+                            self.livy_global_session.session_id, 
+                            auth, 
+                            headers, 
+                            session_params, 
+                            verify_ssl_certificate
+                        )
 
         return livyConnection
 
@@ -383,8 +461,7 @@ class LivySessionConnectionWrapper(object):
         logger.debug("NotImplemented: cancel")
 
     def close(self):
-        if self._cursor:
-            self._cursor.close()
+        self.handle.close()
 
     def rollback(self, *args, **kwargs):
         logger.debug("NotImplemented: rollback")

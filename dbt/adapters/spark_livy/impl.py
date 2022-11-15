@@ -429,6 +429,11 @@ class SparkAdapter(SQLAdapter):
 
         self.connections.get_thread_connection().handle.close()
 
+    def cleanup_connections(self) -> None:
+        self.connections.cleanup_all()
+        logger.debug("cleanup_connections")
+        SparkConnectionManager.connection_manager.livy_global_session.delete_session()
+
 
 # spark does something interesting with joins when both tables have the same
 # static values for the join condition and complains that the join condition is
