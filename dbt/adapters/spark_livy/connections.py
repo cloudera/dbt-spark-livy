@@ -304,7 +304,7 @@ class SparkConnectionManager(SQLConnectionManager):
     SPARK_SQL_ENDPOINT_HTTP_PATH = "/sql/1.0/endpoints/{endpoint}"
     SPARK_CONNECTION_URL = "{host}:{port}" + SPARK_CLUSTER_HTTP_PATH
 
-    connection_manager = None
+    connection_managers = {}
 
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
@@ -482,11 +482,13 @@ class SparkConnectionManager(SQLConnectionManager):
                     connection_start_time = time.time()
                     connection_ex = None
                     try:
-                        if not SparkConnectionManager.connection_manager:
-                             SparkConnectionManager.connection_manager = LivyConnectionManager()
+                        thread_id = cls.get_thread_identifier() 
+
+                        if not thread_id in SparkConnectionManager.connection_managers:
+                             SparkConnectionManager.connection_managers[thread_id] = LivyConnectionManager()
 
                         handle = LivySessionConnectionWrapper(
-                             SparkConnectionManager.connection_manager.connect(
+                             SparkConnectionManager.connection_managers[thread_id].connect(
                                                              creds.host,
                                                              creds.user,
                                                              creds.password,
