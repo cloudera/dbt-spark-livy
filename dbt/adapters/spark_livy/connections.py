@@ -304,6 +304,8 @@ class SparkConnectionManager(SQLConnectionManager):
     SPARK_SQL_ENDPOINT_HTTP_PATH = "/sql/1.0/endpoints/{endpoint}"
     SPARK_CONNECTION_URL = "{host}:{port}" + SPARK_CLUSTER_HTTP_PATH
 
+    connection_manager = None
+
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
         # generate profile related object for instrumentation.
@@ -480,17 +482,20 @@ class SparkConnectionManager(SQLConnectionManager):
                     connection_start_time = time.time()
                     connection_ex = None
                     try:
+                        if not SparkConnectionManager.connection_manager:
+                             SparkConnectionManager.connection_manager = LivyConnectionManager()
+
                         handle = LivySessionConnectionWrapper(
-                            LivyConnectionManager()
-                            .connect(
-                                creds.host,
-                                creds.user,
-                                creds.password,
-                                creds.auth,
-                                creds.livy_session_parameters,
-                                creds.verify_ssl_certificate
-                            )
+                             SparkConnectionManager.connection_manager.connect(
+                                                             creds.host,
+                                                             creds.user,
+                                                             creds.password,
+                                                             creds.auth,
+                                                             creds.livy_session_parameters,
+                                                             creds.verify_ssl_certificate
+                                                         )
                         )
+
                         connection_end_time = time.time()
                         connection.state = ConnectionState.OPEN
                     except Exception as ex:
