@@ -27,6 +27,7 @@ from dbt.adapters.base import Credentials
 from dbt.events import AdapterLogger
 from decouple import config
 
+
 # global logger
 logger = AdapterLogger("Tracker")
 
@@ -57,9 +58,7 @@ def populate_platform_info(cred: Credentials, ver):
     platform_info["system"] = platform.system()
     # Architecture e.g. x86_64 ,arm, AMD64
     platform_info["machine"] = platform.machine()
-    # Full platform info e.g.
-    # Linux-2.6.32-32-server-x86_64-with-Ubuntu-10.04-lucid,
-    # Windows-2008ServerR2-6.1.7601-SP1
+    # Full platform info e.g Linux-2.6.32-32-server-x86_64-with-Ubuntu-10.04-lucid,Windows-2008ServerR2-6.1.7601-SP1
     platform_info["platform"] = platform.platform()
     # dbt core version
     platform_info[
@@ -72,8 +71,8 @@ def populate_dbt_deployment_env_info():
     """
     populate dbt deployment environment variables if available to be passed on for tracking
     """
-    default_value = ""  # if environment variables doesn't exist add empty string as default
-    dbt_deployment_env_info["dbt_deployment_env"] = os.environ.get('DBT_DEPLOYMENT_ENV', default_value)
+    default_value = "{}"  # if environment variables doesn't exist add empty json as default
+    dbt_deployment_env_info["dbt_deployment_env"] = json.loads(os.environ.get('DBT_DEPLOYMENT_ENV', default_value))
 
 def populate_unique_ids(cred: Credentials):
     host = str(cred.host).encode()
@@ -109,7 +108,6 @@ def _merge_keys(source_dict, dest_dict):
         dest_dict[key] = value
     return dest_dict
 
-
 def _get_sql_type(sql):
     if not sql:
         return ""
@@ -121,10 +119,9 @@ def _get_sql_type(sql):
     else:
         sql_words = words[0].strip().split()
 
-    sql_type = " ".join(sql_words[: min(2, len(sql_words))]).lower()
+    sql_type = " ".join(sql_words[:min(2, len(sql_words))]).lower()
 
     return sql_type
-
 
 def fix_tracking_payload(given_payload):
     """
@@ -140,7 +137,7 @@ def fix_tracking_payload(given_payload):
     if "sql" in desired_payload:
         desired_payload["sql_type"] = _get_sql_type(desired_payload["sql"])
         del desired_payload["sql"]
-
+   
     desired_keys = [
         "auth",
         "connection_state",
@@ -150,7 +147,7 @@ def fix_tracking_payload(given_payload):
         "model_type",
         "permissions",
         "profile_name",
-        "sql_type",
+        "sql_type"
     ]
 
     for key in desired_keys:
@@ -176,10 +173,7 @@ def track_usage(tracking_payload):
 
     global usage_tracking
 
-    logger.debug(
-        f"Usage tracking flag {usage_tracking}."
-        f"To turn on/off use usage_tracking flag in profiles.yml"
-    )
+    logger.debug(f"Usage tracking flag {usage_tracking}. To turn on/off use usage_tracking flag in profiles.yml")
 
     # if usage_tracking is disabled, quit
     if not usage_tracking:
@@ -224,12 +218,8 @@ def track_usage(tracking_payload):
         res = None
 
         try:
-            logger.debug(f"Sending Event {data}")
             res = requests.post(
-                SNOWPLOW_ENDPOINT,
-                data=data,
-                headers=headers,
-                timeout=SNOWPLOW_TIMEOUT
+                SNOWPLOW_ENDPOINT, data=data, headers=headers, timeout=SNOWPLOW_TIMEOUT
             )
         except Exception as err:
             logger.debug(f"Usage tracking error. {err}")
@@ -237,6 +227,8 @@ def track_usage(tracking_payload):
             usage_tracking = False
 
         return res
+
+    logger.debug(f"Sending Event {tracking_data}")
 
     # call the tracking function in a Thread
     the_track_thread = threading.Thread(
