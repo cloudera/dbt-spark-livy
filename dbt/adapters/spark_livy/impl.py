@@ -408,34 +408,6 @@ class SparkAdapter(SQLAdapter):
     def debug_query(self) -> None:
         self.execute("select 1 as id")
 
-        # query warehouse version
-        try:
-            sql_query = "select version()"
-            _, table = self.execute(sql_query, True, True)
-            version_object = []
-            json_funcs = [c.jsonify for c in table.column_types]
-
-            for row in table.rows:
-                values = tuple(json_funcs[i](d) for i, d in enumerate(row))
-                version_object.append(OrderedDict(zip(row.keys(), values)))
-
-            version_json = json.dumps(version_object)
-
-            payload = {
-                "event_type": "dbt_spark_livy_warehouse",
-                "warehouse_version": version_json,
-            }
-            tracker.track_usage(payload)
-        except Exception as ex:
-            logger.debug(
-                f"Warehouse version not available. Reason: {ex}"
-            )
-            payload = {
-                "event_type": "dbt_spark_livy_warehouse",
-                "warehouse_version": "NA",
-            }
-            tracker.track_usage(payload)
-
         self.connections.get_thread_connection().handle.close()
 
     def cleanup_connections(self) -> None:

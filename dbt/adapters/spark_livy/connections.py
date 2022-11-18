@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+import os
 import json
 import time
 
@@ -306,6 +307,8 @@ class SparkConnectionManager(SQLConnectionManager):
 
     connection_managers = {}
 
+    spark_version = None
+
     def __init__(self, profile: AdapterRequiredConfig):
         super().__init__(profile)
         # generate profile related object for instrumentation.
@@ -500,6 +503,8 @@ class SparkConnectionManager(SQLConnectionManager):
 
                         connection_end_time = time.time()
                         connection.state = ConnectionState.OPEN
+
+                        SparkConnectionManager.fetch_spark_version(handle)
                     except Exception as ex:
                         logger.debug("Connection error: {}".format(ex))
                         connection_ex = ex
@@ -591,6 +596,40 @@ class SparkConnectionManager(SQLConnectionManager):
             return connection
         except Exception as err:
             logger.debug(f"Error closing connection {err}")
+
+    @classmethod
+    def fetch_spark_version(cls, connection):
+
+        if SparkConnectionManager.spark_version: 
+            return SparkConnectionManager.spark_version
+
+        try:
+            sql = "select version()"
+            cursor = connection.handle.cursor()
+            cursor.execute(sql)
+
+            res = cursor.fetchall()
+
+            SparkConnectionManager.spark_version = res[0][0].split(".")[0]
+
+            payload = {
+                "event_type": "dbt_spark_livy_warehouse",
+                "warehouse_version": { "version": SparkConnectionManager.spark_version, "build": res[0][0] },
+            }
+            tracker.track_usage(payload)
+        except Exception as ex:
+            # we couldn't get the spark warehouse version, default to version 2
+            logger.debug(f"Cannot get spark version, defaulting to version 2. Error: {ex}")
+            SparkConnectionManager.spark_version = "2"
+
+            payload = {
+                "event_type": "dbt_spark_livy_warehouse",
+                "warehouse_version": { "version": "2", "build": "NA" },
+            }
+            tracker.track_usage(payload)
+
+        os.environ['DBT_SPARK_VERSION'] = SparkConnectionManager.spark_version 
+        logger.debug(f"SPARK VERSION {os.getenv('DBT_SPARK_VERSION')}")
 
     def add_query(
         self,
