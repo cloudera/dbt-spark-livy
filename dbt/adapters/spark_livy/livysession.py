@@ -111,15 +111,18 @@ class LivySession:
         return self.session_id
 
     def delete_session(self):
-        logger.debug(f"Closing the connection and livy session: {self.session_id}")
+        logger.debug(f"Closing the livy session: {self.session_id}")
 
-        # delete the session_id
-        _ = requests.delete(
-            self.connect_url + '/sessions/' + self.session_id,
-            headers=self.headers,
-            auth=self.auth,
-            verify=self.verify_ssl_certificate
-        )
+        try:
+            # delete the session_id
+            _ = requests.delete(
+                self.connect_url + '/sessions/' + self.session_id,
+                headers=self.headers,
+                auth=self.auth,
+                verify=self.verify_ssl_certificate
+            )
+        except Exception as ex:
+            logger.error(f"Unable to close the livy session {self.session_id}, error: {ex}")
 
     def is_valid_session(self):
         res = requests.get(
