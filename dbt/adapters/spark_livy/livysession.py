@@ -434,7 +434,7 @@ class LivyConnectionManager:
             self.livy_global_session.create_session(data)
         elif not self.livy_global_session.is_valid_session():
             self.livy_global_session.delete_session()
-            self.livy_global_session.create_session()
+            self.livy_global_session.create_session(data)
         else:
             logger.debug(f"Reusing session: {self.livy_global_session.session_id}")
 
