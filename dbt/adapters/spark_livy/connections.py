@@ -109,7 +109,7 @@ class SparkCredentials(Credentials):
         # get dbt deployment env information for tracking
         tracker.populate_dbt_deployment_env_info()
         # generate unique ids for tracking
-        tracker.populate_unique_ids(self)
+        tracker.populate_unique_ids(self, "user")
 
         # spark classifies database and schema as the same thing
         if self.database is not None and self.database != self.schema:
@@ -513,7 +513,7 @@ class SparkConnectionManager(SQLConnectionManager):
 
                     # track usage
                     payload = {
-                        "event_type": "dbt_spark_livy_open",
+                        "event_type": tracker.TrackingEventType.OPEN,
                         "auth": "livy",
                         "connection_state": connection.state,
                         "elapsed_time": "{:.2f}".format(
@@ -584,7 +584,7 @@ class SparkConnectionManager(SQLConnectionManager):
             connection_close_end_time = time.time()
 
             payload = {
-                "event_type": "dbt_spark_livy_close",
+                "event_type": tracker.TrackingEventType.CLOSE,
                 "connection_state": ConnectionState.CLOSED,
                 "elapsed_time": "{:.2f}".format(
                     connection_close_end_time - connection_close_start_time
@@ -612,21 +612,13 @@ class SparkConnectionManager(SQLConnectionManager):
 
             SparkConnectionManager.spark_version = res[0][0].split(".")[0]
 
-            payload = {
-                "event_type": "dbt_spark_livy_warehouse",
-                "warehouse_version": { "version": SparkConnectionManager.spark_version, "build": res[0][0] },
-            }
-            tracker.track_usage(payload)
+            tracker.populate_warehouse_info({ "version": SparkConnectionManager.spark_version, "build": res[0][0] })
         except Exception as ex:
             # we couldn't get the spark warehouse version, default to version 2
             logger.debug(f"Cannot get spark version, defaulting to version 2. Error: {ex}")
             SparkConnectionManager.spark_version = "2"
 
-            payload = {
-                "event_type": "dbt_spark_livy_warehouse",
-                "warehouse_version": { "version": "2", "build": "NA" },
-            }
-            tracker.track_usage(payload)
+            tracker.populate_warehouse_info({ "version": SparkConnectionManager.spark_version, "build": "NA" })
 
         os.environ['DBT_SPARK_VERSION'] = SparkConnectionManager.spark_version 
         logger.debug(f"SPARK VERSION {os.getenv('DBT_SPARK_VERSION')}")
@@ -659,7 +651,7 @@ class SparkConnectionManager(SQLConnectionManager):
 
             # track usage
             payload = {
-                "event_type": "dbt_spark_livy_start_query",
+                "event_type": tracker.TrackingEventType.START_QUERY,
                 "sql": log_sql,
                 "profile_name": self.profile.profile_name
             }
@@ -686,7 +678,7 @@ class SparkConnectionManager(SQLConnectionManager):
             elapsed_time = time.time() - pre
 
             payload = {
-                "event_type": "dbt_spark_livy_end_query",
+                "event_type": tracker.TrackingEventType.END_QUERY,
                 "sql": log_sql,
                 "elapsed_time": "{:.2f}".format(elapsed_time),
                 "status": query_status,
