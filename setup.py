@@ -48,7 +48,7 @@ def _get_dbt_core_version():
 
 
 package_name = "dbt-spark-livy"
-package_version = "1.3.0"
+package_version = "1.3.1"
 dbt_core_version = _get_dbt_core_version()
 description = """The dbt-spark-livy adapter plugin for Spark in Cloudera DataHub with Livy interface"""
 
