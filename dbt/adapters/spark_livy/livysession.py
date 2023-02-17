@@ -19,12 +19,13 @@ from cmath import log
 
 import json
 import time 
+import re
 import requests
 from urllib import response
 
 import datetime as dt
 from types import TracebackType
-from typing import Any
+from typing import Any, Optional
 
 import dbt.exceptions
 from dbt.events import AdapterLogger
@@ -36,6 +37,39 @@ logger = AdapterLogger("Spark")
 NUMBERS = DECIMALS + (int, float)
 
 DEFAULT_POLL_WAIT = 2
+
+_TIMESTAMP_PATTERN = re.compile(r'(\d+-\d+-\d+T\d+:\d+:\d+(\.\d{,6})?Z)')
+
+
+def __parse_timestamp_from_string(value: str) -> Optional[dt.datetime]:
+    if not value:
+        return None
+
+    match = _TIMESTAMP_PATTERN.match(value)
+    if not match:
+        raise Exception(
+            'Cannot convert "{}" into a datetime'.format(value))
+
+    if match.group(2):
+        fmt = '%Y-%m-%dT%H:%M:%S.%fZ'
+        # use the pattern to truncate the value
+        value = match.group()
+    else:
+        fmt = '%Y-%m-%dT%H:%M:%SZ'
+
+    return dt.datetime.strptime(value, fmt)
+
+
+TYPES_CONVERTER = {"timestamp": __parse_timestamp_from_string}
+
+
+def _maybe_coerce_value_from_string(value, type_=None):
+    """coerce string from response into supported data type (eg. datetime)"""
+    maybe_converter = TYPES_CONVERTER.get(type_, None)
+    if maybe_converter and type_:
+        return maybe_converter(value)
+    return value
+
 
 class LivySession:
     def __init__(self, connect_url, auth, headers, verify_ssl_certificate):
@@ -262,6 +296,20 @@ class LivyCursor:
                 return res
             time.sleep(DEFAULT_POLL_WAIT)
 
+    @classmethod
+    def _coerce_some_primitive_types(cls, schema, rows):
+        """ as each SQL adapter is now required to ad logic
+        to coerce some types from response (eg. timestamp)
+        https://github.com/dbt-labs/dbt-core/pull/3499
+        """
+        converted_rows = []
+        for row in rows:
+            converted_rows.append([
+                _maybe_coerce_value_from_string(col, col_schema['type'])
+                for col, col_schema in zip(row, schema)
+            ])
+        return converted_rows
+
     def execute(self, sql: str, *parameters: Any) -> None:
         """
         Execute a sql statement.
@@ -293,10 +341,8 @@ class LivyCursor:
             # values = res['output']['data']['application/json']
             values = res['output']['data']['application/json']
             if (len(values) >= 1):
-                self._rows = values['data'] # values[0]['values']
-                self._schema = values['schema']['fields'] # values[0]['schema']
-                # print("rows", self._rows)
-                # print("schema", self._schema)
+                self._schema = values['schema']['fields']
+                self._rows = self._coerce_some_primitive_types(self._schema, values['data'])
             else:
                 self._rows = []
                 self._schema = []
