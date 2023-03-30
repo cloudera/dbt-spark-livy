@@ -1,0 +1,23 @@
+name: Cleanup old branches
+on:
+  push:
+    branches:
+      - main
+jobs:
+  housekeeping:
+    name: Cleanup old branches
+    runs-on: dbt-spark-livy
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Run delete-old-branches-action
+        uses: beatlabs/delete-old-branches-action@v0.0.9
+        with:
+          repo_token: ${{ github.token }}
+          date: '3 months ago'
+          dry_run: true
+          delete_tags: true
+          minimum_tags: 5
+          extra_protected_branch_regex: ^(foo|bar)$
+          extra_protected_tag_regex: '^v.*'
+          exclude_open_pr_branches: true
